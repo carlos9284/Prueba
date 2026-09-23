@@ -10,16 +10,20 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputFilter;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +34,15 @@ import java.util.Locale;
 
 public class MainActivity extends Activity {
 
+    private static final int BLUE = Color.rgb(11, 110, 153);
+    private static final int TEAL = Color.rgb(31, 143, 131);
+    private static final int BG = Color.rgb(245, 248, 250);
+    private static final int TEXT = Color.rgb(26, 39, 52);
+    private static final int MUTED = Color.rgb(91, 104, 116);
+    private static final int GREEN = Color.rgb(21, 128, 61);
+    private static final int RED = Color.rgb(190, 40, 40);
+    private static final int ORANGE = Color.rgb(196, 120, 0);
+
     private EditText patientInput;
     private TextView statusText;
     private TextView connectionText;
@@ -37,6 +50,7 @@ public class MainActivity extends Activity {
     private TextView lastAlertText;
     private Spinner intervalSpinner;
     private SharedPreferences prefs;
+
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private final Runnable refreshRunnable = new Runnable() {
         @Override
@@ -51,45 +65,74 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences("hun_prefs", MODE_PRIVATE);
 
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(BG);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(24), dp(28), dp(24), dp(24));
-        root.setGravity(Gravity.CENTER_HORIZONTAL);
-        root.setBackgroundColor(Color.WHITE);
+        root.setPadding(dp(18), dp(18), dp(18), dp(28));
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setPadding(dp(20), dp(20), dp(20), dp(20));
+        header.setGravity(Gravity.CENTER);
+        header.setBackground(rounded(BLUE, 22));
+        root.addView(header, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView cross = new TextView(this);
+        cross.setText("+");
+        cross.setTextSize(42);
+        cross.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        cross.setTextColor(Color.WHITE);
+        cross.setGravity(Gravity.CENTER);
+        header.addView(cross, new LinearLayout.LayoutParams(-1, dp(52)));
 
         TextView title = new TextView(this);
         title.setText("Aviso HUN");
         title.setTextSize(30);
-        title.setTextColor(Color.BLACK);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setTextColor(Color.WHITE);
         title.setGravity(Gravity.CENTER);
-        root.addView(title, new LinearLayout.LayoutParams(-1, -2));
+        header.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Vigila tu código de paciente y recibe una notificación cuando te llamen.");
-        subtitle.setTextSize(15);
-        subtitle.setTextColor(Color.DKGRAY);
+        subtitle.setText("Te avisamos cuando aparezca tu código de paciente.");
+        subtitle.setTextSize(14);
+        subtitle.setTextColor(Color.rgb(225, 242, 248));
         subtitle.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams subParams = new LinearLayout.LayoutParams(-1, -2);
-        subParams.setMargins(0, dp(10), 0, dp(20));
-        root.addView(subtitle, subParams);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        subtitleParams.setMargins(0, dp(6), 0, 0);
+        header.addView(subtitle, subtitleParams);
+
+        LinearLayout controlCard = card();
+        LinearLayout.LayoutParams controlParams = new LinearLayout.LayoutParams(-1, -2);
+        controlParams.setMargins(0, dp(16), 0, 0);
+        root.addView(controlCard, controlParams);
+
+        TextView codeLabel = label("Código de paciente");
+        controlCard.addView(codeLabel);
 
         patientInput = new EditText(this);
         patientInput.setHint("Ejemplo: JC580");
         patientInput.setSingleLine(true);
-        patientInput.setTextSize(22);
+        patientInput.setTextSize(24);
+        patientInput.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        patientInput.setTextColor(TEXT);
+        patientInput.setHintTextColor(Color.rgb(145, 155, 164));
         patientInput.setGravity(Gravity.CENTER);
         patientInput.setAllCaps(true);
         patientInput.setFilters(new InputFilter[]{new InputFilter.LengthFilter(20)});
         patientInput.setText(prefs.getString("patient", ""));
-        root.addView(patientInput, new LinearLayout.LayoutParams(-1, dp(62)));
+        patientInput.setPadding(dp(14), 0, dp(14), 0);
+        patientInput.setBackground(roundedStroke(Color.WHITE, Color.rgb(204, 215, 223), 14));
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, dp(62));
+        inputParams.setMargins(0, dp(8), 0, dp(14));
+        controlCard.addView(patientInput, inputParams);
 
-        TextView intervalLabel = new TextView(this);
-        intervalLabel.setText("Comprobar cada:");
-        intervalLabel.setTextSize(14);
-        intervalLabel.setTextColor(Color.DKGRAY);
-        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
-        labelParams.setMargins(0, dp(16), 0, dp(4));
-        root.addView(intervalLabel, labelParams);
+        TextView intervalLabel = label("Comprobar cada");
+        controlCard.addView(intervalLabel);
 
         intervalSpinner = new Spinner(this);
         String[] options = {"15 segundos", "30 segundos", "60 segundos"};
@@ -97,46 +140,55 @@ public class MainActivity extends Activity {
         intervalSpinner.setAdapter(adapter);
         int savedInterval = prefs.getInt("interval_seconds", 15);
         intervalSpinner.setSelection(savedInterval == 60 ? 2 : savedInterval == 30 ? 1 : 0);
-        root.addView(intervalSpinner, new LinearLayout.LayoutParams(-1, dp(52)));
+        intervalSpinner.setBackground(roundedStroke(Color.WHITE, Color.rgb(204, 215, 223), 14));
+        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(-1, dp(54));
+        spinnerParams.setMargins(0, dp(8), 0, dp(16));
+        controlCard.addView(intervalSpinner, spinnerParams);
 
-        Button startButton = new Button(this);
-        startButton.setText("INICIAR VIGILANCIA");
-        LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(-1, dp(58));
-        startParams.setMargins(0, dp(16), 0, dp(8));
-        root.addView(startButton, startParams);
+        Button startButton = actionButton("INICIAR VIGILANCIA", TEAL, Color.WHITE);
+        controlCard.addView(startButton, buttonParams());
 
-        Button stopButton = new Button(this);
-        stopButton.setText("DETENER");
-        root.addView(stopButton, new LinearLayout.LayoutParams(-1, dp(52)));
+        Button stopButton = actionButton("DETENER", Color.rgb(230, 236, 240), TEXT);
+        LinearLayout.LayoutParams stopParams = buttonParams();
+        stopParams.setMargins(0, dp(8), 0, 0);
+        controlCard.addView(stopButton, stopParams);
 
-        Button testButton = new Button(this);
-        testButton.setText("PROBAR NOTIFICACIÓN");
-        LinearLayout.LayoutParams testParams = new LinearLayout.LayoutParams(-1, dp(52));
+        Button testButton = actionButton("PROBAR NOTIFICACIÓN", Color.WHITE, BLUE);
+        GradientDrawable testBg = roundedStroke(Color.WHITE, Color.rgb(170, 199, 213), 14);
+        testButton.setBackground(testBg);
+        LinearLayout.LayoutParams testParams = buttonParams();
         testParams.setMargins(0, dp(8), 0, 0);
-        root.addView(testButton, testParams);
+        controlCard.addView(testButton, testParams);
 
-        statusText = createInfoText();
-        connectionText = createInfoText();
-        lastCheckText = createInfoText();
-        lastAlertText = createInfoText();
+        LinearLayout statusCard = card();
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.setMargins(0, dp(14), 0, 0);
+        root.addView(statusCard, statusParams);
 
-        LinearLayout.LayoutParams infoParams1 = new LinearLayout.LayoutParams(-1, -2);
-        infoParams1.setMargins(0, dp(22), 0, 0);
-        root.addView(statusText, infoParams1);
-        root.addView(connectionText, new LinearLayout.LayoutParams(-1, -2));
-        root.addView(lastCheckText, new LinearLayout.LayoutParams(-1, -2));
-        root.addView(lastAlertText, new LinearLayout.LayoutParams(-1, -2));
+        TextView statusTitle = label("Estado");
+        statusTitle.setTextSize(17);
+        statusTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        statusCard.addView(statusTitle);
+
+        statusText = statusLine();
+        connectionText = statusLine();
+        lastCheckText = statusLine();
+        lastAlertText = statusLine();
+
+        statusCard.addView(statusText);
+        statusCard.addView(connectionText);
+        statusCard.addView(lastCheckText);
+        statusCard.addView(lastAlertText);
 
         TextView note = new TextView(this);
-        note.setText("La vigilancia funciona mediante una notificación permanente mientras está activa.");
+        note.setText("Mientras la vigilancia esté activa verás una notificación permanente. Puedes cerrar esta pantalla sin detenerla.");
         note.setTextSize(12);
-        note.setTextColor(Color.GRAY);
+        note.setTextColor(MUTED);
         note.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
-        noteParams.setMargins(0, dp(18), 0, 0);
-        root.addView(note, noteParams);
+        note.setPadding(dp(8), dp(18), dp(8), 0);
+        root.addView(note, new LinearLayout.LayoutParams(-1, -2));
 
-        setContentView(root);
+        setContentView(scroll);
 
         requestNotificationPermissionIfNeeded();
         createTestChannel();
@@ -147,13 +199,59 @@ public class MainActivity extends Activity {
         testButton.setOnClickListener(v -> showTestNotification());
     }
 
-    private TextView createInfoText() {
+    private LinearLayout card() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18), dp(18), dp(18), dp(18));
+        card.setBackground(rounded(Color.WHITE, 20));
+        card.setElevation(dp(2));
+        return card;
+    }
+
+    private TextView label(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(14);
+        t.setTextColor(MUTED);
+        return t;
+    }
+
+    private TextView statusLine() {
         TextView t = new TextView(this);
         t.setTextSize(15);
-        t.setGravity(Gravity.CENTER);
-        t.setTextColor(Color.DKGRAY);
-        t.setPadding(0, dp(5), 0, dp(5));
+        t.setTextColor(TEXT);
+        t.setPadding(0, dp(8), 0, dp(2));
         return t;
+    }
+
+    private Button actionButton(String text, int background, int foreground) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setTextSize(15);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setTextColor(foreground);
+        b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(rounded(background, 14));
+        b.setStateListAnimator(null);
+        return b;
+    }
+
+    private LinearLayout.LayoutParams buttonParams() {
+        return new LinearLayout.LayoutParams(-1, dp(56));
+    }
+
+    private GradientDrawable rounded(int color, int radiusDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        return g;
+    }
+
+    private GradientDrawable roundedStroke(int fill, int stroke, int radiusDp) {
+        GradientDrawable g = rounded(fill, radiusDp);
+        g.setStroke(dp(1), stroke);
+        return g;
     }
 
     @Override
@@ -187,6 +285,7 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, MonitoringService.class);
         intent.putExtra("patient", patient);
         intent.putExtra("interval_seconds", interval);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);
         } else {
@@ -200,6 +299,7 @@ public class MainActivity extends Activity {
     private void stopMonitoring() {
         stopService(new Intent(this, MonitoringService.class));
         prefs.edit().putBoolean("monitoring", false).apply();
+        Toast.makeText(this, "Vigilancia detenida", Toast.LENGTH_SHORT).show();
         updateStatus();
     }
 
@@ -209,40 +309,40 @@ public class MainActivity extends Activity {
         int interval = prefs.getInt("interval_seconds", 15);
 
         if (monitoring && !patient.isEmpty()) {
-            statusText.setText("Estado: Vigilando " + patient + " cada " + interval + " s");
-            statusText.setTextColor(Color.rgb(196, 120, 0));
+            statusText.setText("● Vigilancia activa: " + patient + " · cada " + interval + " s");
+            statusText.setTextColor(ORANGE);
         } else {
-            statusText.setText("Estado: Vigilancia detenida");
-            statusText.setTextColor(Color.DKGRAY);
+            statusText.setText("● Vigilancia detenida");
+            statusText.setTextColor(MUTED);
         }
 
         long lastCheck = prefs.getLong("last_check_ms", 0L);
         String checkResult = prefs.getString("last_check_result", "");
+
         if ("OK".equals(checkResult)) {
-            connectionText.setText("Conexion: OK");
-            connectionText.setTextColor(Color.rgb(0, 128, 0));
+            connectionText.setText("● Conexión: OK");
+            connectionText.setTextColor(GREEN);
         } else if (!checkResult.isEmpty()) {
-            connectionText.setText("Conexion: " + checkResult);
-            connectionText.setTextColor(Color.rgb(190, 0, 0));
+            connectionText.setText("● Conexión: " + checkResult);
+            connectionText.setTextColor(RED);
         } else {
-            connectionText.setText("Conexion: esperando primera comprobacion");
-            connectionText.setTextColor(Color.DKGRAY);
+            connectionText.setText("● Conexión: esperando primera comprobación");
+            connectionText.setTextColor(MUTED);
         }
 
         if (lastCheck > 0) {
-            lastCheckText.setText("Última comprobación: " + formatTime(lastCheck) +
-                    (checkResult.isEmpty() ? "" : " · " + checkResult));
+            lastCheckText.setText("Última comprobación: " + formatTime(lastCheck));
         } else {
             lastCheckText.setText("Última comprobación: —");
         }
 
         String lastAlert = prefs.getString("last_alert_text", "");
         if (lastAlert.isEmpty()) {
-            lastAlertText.setText("Ultimo aviso: -");
-            lastAlertText.setTextColor(Color.DKGRAY);
+            lastAlertText.setText("Último aviso: —");
+            lastAlertText.setTextColor(MUTED);
         } else {
-            lastAlertText.setText("Ultimo aviso: " + lastAlert);
-            lastAlertText.setTextColor(Color.BLACK);
+            lastAlertText.setText("Último aviso: " + lastAlert);
+            lastAlertText.setTextColor(TEXT);
         }
     }
 
@@ -273,7 +373,7 @@ public class MainActivity extends Activity {
                 this, 77, openApp, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Notification notification = new Notification.Builder(this, "patient_alert")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_stat_hun)
                 .setContentTitle("Notificación de prueba")
                 .setContentText("Aviso HUN funciona correctamente")
                 .setContentIntent(pi)

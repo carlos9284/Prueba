@@ -153,7 +153,7 @@ public class MonitoringService extends Service {
                 this, 0, openApp, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new Notification.Builder(this, CHANNEL_MONITOR)
-                .setSmallIcon(android.R.drawable.ic_popup_sync)
+                .setSmallIcon(R.drawable.ic_stat_hun)
                 .setContentTitle("Aviso HUN")
                 .setContentText("Vigilando " + patient + " cada " + interval + " s")
                 .setContentIntent(pendingIntent)
@@ -168,7 +168,7 @@ public class MonitoringService extends Service {
 
         String text = location.isEmpty() ? description : location;
         Notification notification = new Notification.Builder(this, CHANNEL_ALERT)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_stat_hun)
                 .setContentTitle("Te están llamando: " + patient)
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(description.isEmpty() ? text : description))

@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
 
     private EditText patientInput;
     private TextView statusText;
+    private TextView connectionText;
     private TextView lastCheckText;
     private TextView lastAlertText;
     private Spinner intervalSpinner;
@@ -115,12 +116,14 @@ public class MainActivity extends Activity {
         root.addView(testButton, testParams);
 
         statusText = createInfoText();
+        connectionText = createInfoText();
         lastCheckText = createInfoText();
         lastAlertText = createInfoText();
 
         LinearLayout.LayoutParams infoParams1 = new LinearLayout.LayoutParams(-1, -2);
         infoParams1.setMargins(0, dp(22), 0, 0);
         root.addView(statusText, infoParams1);
+        root.addView(connectionText, new LinearLayout.LayoutParams(-1, -2));
         root.addView(lastCheckText, new LinearLayout.LayoutParams(-1, -2));
         root.addView(lastAlertText, new LinearLayout.LayoutParams(-1, -2));
 
@@ -207,12 +210,25 @@ public class MainActivity extends Activity {
 
         if (monitoring && !patient.isEmpty()) {
             statusText.setText("Estado: Vigilando " + patient + " cada " + interval + " s");
+            statusText.setTextColor(Color.rgb(196, 120, 0));
         } else {
             statusText.setText("Estado: Vigilancia detenida");
+            statusText.setTextColor(Color.DKGRAY);
         }
 
         long lastCheck = prefs.getLong("last_check_ms", 0L);
         String checkResult = prefs.getString("last_check_result", "");
+        if ("OK".equals(checkResult)) {
+            connectionText.setText("Conexion: OK");
+            connectionText.setTextColor(Color.rgb(0, 128, 0));
+        } else if (!checkResult.isEmpty()) {
+            connectionText.setText("Conexion: " + checkResult);
+            connectionText.setTextColor(Color.rgb(190, 0, 0));
+        } else {
+            connectionText.setText("Conexion: esperando primera comprobacion");
+            connectionText.setTextColor(Color.DKGRAY);
+        }
+
         if (lastCheck > 0) {
             lastCheckText.setText("Última comprobación: " + formatTime(lastCheck) +
                     (checkResult.isEmpty() ? "" : " · " + checkResult));
@@ -221,7 +237,13 @@ public class MainActivity extends Activity {
         }
 
         String lastAlert = prefs.getString("last_alert_text", "");
-        lastAlertText.setText(lastAlert.isEmpty() ? "Último aviso: —" : "Último aviso: " + lastAlert);
+        if (lastAlert.isEmpty()) {
+            lastAlertText.setText("Ultimo aviso: -");
+            lastAlertText.setTextColor(Color.DKGRAY);
+        } else {
+            lastAlertText.setText("Ultimo aviso: " + lastAlert);
+            lastAlertText.setTextColor(Color.BLACK);
+        }
     }
 
     private String formatTime(long millis) {

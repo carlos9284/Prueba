@@ -18,6 +18,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -29,7 +31,6 @@ public class MonitoringService extends Service {
     private static final String CHANNEL_MONITOR = "monitoring";
     private static final String CHANNEL_ALERT = "patient_alert";
     private static final int FOREGROUND_ID = 2001;
-    private static final long POLL_SECONDS = 15;
 
     private ScheduledExecutorService scheduler;
     private String patient;
@@ -50,43 +51,61 @@ public class MonitoringService extends Service {
         }
         patient = patient.trim().toUpperCase(Locale.ROOT);
 
+        int interval = intent != null ? intent.getIntExtra("interval_seconds", -1) : -1;
+        if (interval <= 0) interval = prefs.getInt("interval_seconds", 15);
+        if (interval != 15 && interval != 30 && interval != 60) interval = 15;
+
         if (patient.isEmpty()) {
             stopSelf();
             return START_NOT_STICKY;
         }
 
-        prefs.edit().putString("patient", patient).putBoolean("monitoring", true).apply();
-        startForeground(FOREGROUND_ID, buildMonitoringNotification(patient));
+        prefs.edit()
+                .putString("patient", patient)
+                .putInt("interval_seconds", interval)
+                .putBoolean("monitoring", true)
+                .apply();
 
-        if (scheduler == null || scheduler.isShutdown()) {
-            scheduler = Executors.newSingleThreadScheduledExecutor();
-            scheduler.scheduleWithFixedDelay(this::checkEndpoint, 0, POLL_SECONDS, TimeUnit.SECONDS);
-        }
+        startForeground(FOREGROUND_ID, buildMonitoringNotification(patient, interval));
+
+        if (scheduler != null) scheduler.shutdownNow();
+        scheduler = Executors.newSingleThreadScheduledExecutor();
+        final int pollSeconds = interval;
+        scheduler.scheduleWithFixedDelay(this::checkEndpoint, 0, pollSeconds, TimeUnit.SECONDS);
+
         return START_STICKY;
     }
 
     private void checkEndpoint() {
         HttpURLConnection connection = null;
+        long now = System.currentTimeMillis();
+
         try {
-            URL url = new URL(ENDPOINT + "?_=" + System.currentTimeMillis());
+            URL url = new URL(ENDPOINT + "?_=" + now);
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(8000);
             connection.setReadTimeout(8000);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("X-Requested-With", "XMLHttpRequest");
-            connection.setRequestProperty("User-Agent", "HUNUrgencias/1.0 Android");
+            connection.setRequestProperty("User-Agent", "AvisoHUN/1.1 Android");
 
             int code = connection.getResponseCode();
-            if (code != 200) return;
+            if (code != 200) {
+                saveCheckStatus(now, "HTTP " + code);
+                return;
+            }
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder body = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) body.append(line);
             reader.close();
 
             JSONArray array = new JSONArray(body.toString());
+            saveCheckStatus(now, "OK");
+
             for (int i = 0; i < array.length(); i++) {
                 JSONObject item = array.optJSONObject(i);
                 if (item == null) continue;
@@ -97,29 +116,46 @@ public class MonitoringService extends Service {
                 String fecha = String.valueOf(item.opt("Fecha"));
                 String lastKey = "last_fecha_" + patient;
                 String lastFecha = prefs.getString(lastKey, "");
+
+                String location = item.optString("Ubicacion", "");
+                String description = item.optString("Descripcion", "");
+
+                String alertSummary = patient +
+                        (location.isEmpty() ? "" : " · " + location) +
+                        " · " + new SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(new Date());
+
+                prefs.edit().putString("last_alert_text", alertSummary).apply();
+
                 if (fecha.equals(lastFecha)) return;
 
                 prefs.edit().putString(lastKey, fecha).apply();
-                String location = item.optString("Ubicacion", "");
-                String description = item.optString("Descripcion", "");
                 showPatientNotification(patient, location, description);
                 return;
             }
-        } catch (Exception ignored) {
+
+        } catch (Exception e) {
+            saveCheckStatus(now, "Error de conexión");
         } finally {
             if (connection != null) connection.disconnect();
         }
     }
 
-    private Notification buildMonitoringNotification(String patient) {
+    private void saveCheckStatus(long millis, String result) {
+        prefs.edit()
+                .putLong("last_check_ms", millis)
+                .putString("last_check_result", result)
+                .apply();
+    }
+
+    private Notification buildMonitoringNotification(String patient, int interval) {
         Intent openApp = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 0, openApp, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         return new Notification.Builder(this, CHANNEL_MONITOR)
                 .setSmallIcon(android.R.drawable.ic_popup_sync)
-                .setContentTitle("HUN Urgencias")
-                .setContentText("Vigilando " + patient)
+                .setContentTitle("Aviso HUN")
+                .setContentText("Vigilando " + patient + " cada " + interval + " s")
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
@@ -140,8 +176,7 @@ public class MonitoringService extends Service {
                 .setAutoCancel(true)
                 .build();
 
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.notify(3001, notification);
+        getSystemService(NotificationManager.class).notify(3001, notification);
     }
 
     private void createChannels() {
@@ -152,7 +187,7 @@ public class MonitoringService extends Service {
                     CHANNEL_MONITOR,
                     "Vigilancia activa",
                     NotificationManager.IMPORTANCE_LOW);
-            monitor.setDescription("Indica que la app está comprobando tu código de paciente.");
+            monitor.setDescription("Indica que Aviso HUN está comprobando tu código.");
 
             NotificationChannel alert = new NotificationChannel(
                     CHANNEL_ALERT,
